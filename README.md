@@ -50,8 +50,9 @@ This combines the three factors essential for intelligent scheduling:
 * **Importance (`QoS_Weight`)**: How critical is this specific data flow?
 
 > #### An Important Refinement
-> In practice, a raw `Queue_Backlog` can grow so large that it overpowers the `QoS_Weight`. A more robust implementation (and the recommended version for research) uses the logarithm of the queue to dampen this effect, making the scheduler more responsive to the QoS priority:
-> $$ \text{Score} = \log(1 + \text{Queue\_Backlog}) \times \text{Instantaneous\_Rate} \times \text{QoS\_Weight} $$
+> In practice, a raw `Queue_Backlog` can grow so large that it overpowers the `QoS_Weight`. A more robust implementation (and the recommended version for research) uses the logarithm of the queue to dampen this effect, making the scheduler more responsive to the QoS priority: 
+>  $$ \text{Score} = \log(1 + \text{Queue\_Backlog}) \times \text{Instantaneous\_Rate} \times \text{QoS\_Weight} $$
+>  
 
 ---
 
@@ -139,4 +140,5 @@ The true value of this scheduler is revealed when the network is under load.
         
 
 ## 🚀 6. Conclusion and Future Work
+
 This project successfully implements a QoS-aware scheduler based on the principles of Lyapunov optimization. Through simulation in a congested industrial 5G scenario, it has been shown to effectively protect high-priority, delay-sensitive traffic by prioritizing system stability over traditional fairness metrics.
