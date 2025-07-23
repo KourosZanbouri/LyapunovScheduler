@@ -51,8 +51,7 @@ This combines the three factors essential for intelligent scheduling:
 
 > #### An Important Refinement
 > In practice, a raw `Queue_Backlog` can grow so large that it overpowers the `QoS_Weight`. A more robust implementation (and the recommended version for research) uses the logarithm of the queue to dampen this effect, making the scheduler more responsive to the QoS priority: 
->  $$ Score= \log(1 + Queue\_Backlog) \times Instantaneous\_Rate \times QoS\_Weight $$
-
+$$ Score = \log(1 + Queue\_Backlog) \times Instantaneous\_Rate \times QoS\_Weight $$
 ---
 
 
