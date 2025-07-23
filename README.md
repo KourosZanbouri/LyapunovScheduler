@@ -139,10 +139,4 @@ The true value of this scheduler is revealed when the network is under load.
         
 
 ## 🚀 6. Conclusion and Future Work
-
 This project successfully implements a QoS-aware scheduler based on the principles of Lyapunov optimization. Through simulation in a congested industrial 5G scenario, it has been shown to effectively protect high-priority, delay-sensitive traffic by prioritizing system stability over traditional fairness metrics.
-
-A promising area for future research would be to implement a hybrid scheduler that combines the stability of the Lyapunov framework with the starvation-prevention of Proportional Fair. This could be achieved with a metric like:
-
-$$\text{Score} = \frac{\log(1 + Q_{cid}) \times R_{cid} \times W_{cid}}{T_{avg}} $$
-This would create a scheduler that is stable and QoS-aware in the short term, while still guaranteeing a baseline level of service to all users in the long term. 
