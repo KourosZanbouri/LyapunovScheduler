@@ -43,7 +43,7 @@ By choosing the action that minimizes this drift, we are inherently prioritizing
 The rule that minimizes the Lyapunov drift is one that maximizes the product of queue size and service rate. To incorporate different service priorities, we use a **Weighted Max-Weight** approach.
 
 The core metric used by this scheduler is:
-$$  Score = \text{Queue\_Backlog} \times \text{Instantaneous\_Rate} \times \text{QoS\_Weight} $$
+$$  Score = Queue\_Backlog \times Instantaneous\_Rate \times QoS\_Weight $$
 This combines the three factors essential for intelligent scheduling:
 * **Urgency (`Queue_Backlog`)**: How much data is waiting? This is the primary term derived from the Lyapunov drift.
 * **Opportunity (`Instantaneous_Rate`)**: How good is the user's channel right now?
@@ -51,7 +51,7 @@ This combines the three factors essential for intelligent scheduling:
 
 > #### An Important Refinement
 > In practice, a raw `Queue_Backlog` can grow so large that it overpowers the `QoS_Weight`. A more robust implementation (and the recommended version for research) uses the logarithm of the queue to dampen this effect, making the scheduler more responsive to the QoS priority: 
->  $$ Score= \log(1 + \text{Queue\_Backlog}) \times \text{Instantaneous\_Rate} \times \text{QoS\_Weight} $$
+>  $$ Score= \log(1 + Queue\_Backlog) \times Instantaneous\_Rate \times QoS\_Weight $$
 
 ---
 
