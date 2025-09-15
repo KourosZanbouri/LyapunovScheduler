@@ -323,7 +323,7 @@ struct SchedulingInfo {
 
 void LyapunovScheduler::prepareSchedule()
 {
-    EV << NOW << " HybridLyapunovScheduler::prepareSchedule (Final Fixed Version)" << endl;
+    EV << NOW << " HybridLyapunovScheduler::prepareSchedule" << endl;
 
     const LteMacBufferMap* virtualBuffers = (direction_ == UL) ? eNbScheduler_->mac_->getBsrVirtualBuffers() : nullptr;
     grantedBytes_.clear();
@@ -427,6 +427,12 @@ When running a simulation with heavy congestion, the `LyapunovScheduler` should 
 * **Significantly Lower Throughput** for the best-effort flow (e.g., QFI 7), which is intentionally starved to protect the critical traffic.
 
 This behavior proves the effectiveness of the stability-oriented approach in maintaining strict QoS guarantees.
+
+---
+
+## Future work
+
+* **HOL-aware scheduler** Head-of-Line (HOL) delay - This calculates how close the oldest packet is to violating its delay budget. A scheduler that prioritizes flows with high "urgency" can provide much stronger latency guarantees, moving beyond just considering queue size. This is a feature of very advanced schedulers like M-LWDF (Modified-Largest Weighted Delay First).
 
 ---
 
