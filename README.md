@@ -144,11 +144,12 @@ To use the scheduler, configure your `.ini` and QoS mapping files.
 
 ```ini
 # 1. Select your custom scheduler
-**.gNBs.lteNic.mac.schedulerType = "LYAPUNOV_SCHEDULER"
+**.mac.schedulingDiscipline* = ${scheduler="LYAPUNOV_SCHEDULER"}
+
 
 # 2. Provide the tuning parameters for your scheduler
-**.gNBs.lteNic.mac.scheduler.alpha = 1.5
-**.gNBs.lteNic.mac.scheduler.beta = 1.2
+**.LteMacEnb.alpha = 1.5
+**.LteMacEnb.*.beta = 1.2
 
 # 3. Ensure queues are large enough to prevent artificial packet drops
 *.gnb.**.queueSize = 204800B
