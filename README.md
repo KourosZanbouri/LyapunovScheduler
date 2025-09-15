@@ -1,12 +1,11 @@
-
-# Lyapunov-based QoS Scheduler for Simu5G
+# 5G Hybrid Lyapunov Scheduler for Simu5G
 
 ![Language](https://img.shields.io/badge/C%2B%2B-17-blue.svg)
-![Framework](https://img.shields.io/badge/OMNeT%2B%2B-6.1-green.svg)
+![Framework](https://img.shields.io/badge/OMNeT%2B%2B-6.x-green.svg)
 ![Library](https://img.shields.io/badge/Simu5G-1.3.0-orange.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-A custom uplink/downlink scheduler for the Simu5G/OMNeT++ framework that uses Lyapunov optimization to provide enhanced Quality of Service (QoS) differentiation and queue stability for 5G networks.
+A custom, tunable uplink/downlink scheduler for the Simu5G/OMNeT++ framework that uses Lyapunov optimization to provide enhanced Quality of Service (QoS) differentiation and queue stability for 5G networks.
 
 ---
 
@@ -22,7 +21,7 @@ Lyapunov optimization provides a framework for making online decisions in a stoc
 
 ### The Lyapunov Function: A Measure of Instability
 
-At its core is the **Lyapunov function**, which is a scalar value that represents the "energy" or "pressure" in a system. For a system to be stable, its energy should not increase over time. In a communication network, the system state is the set of all data queue backlogs, $Q(t)$. The Lyapunov function is defined as the sum of the squares of these backlogs:
+At its core is the **Lyapunov function**, a scalar value that represents the "energy" or "pressure" in a system. For a system to be stable, its energy should not increase over time. In a communication network, the system state is the set of all data queue backlogs, $Q(t)$. The Lyapunov function is defined as the sum of the squares of these backlogs:
 
 $$ L(Q(t)) = \frac{1}{2}\sum_{i} Q_{i}(t)^2 $$
 
@@ -34,109 +33,402 @@ The **Lyapunov drift**, $\Delta L(t)$, is the expected change in the function ov
 
 $$ \Delta L(t) = \mathbb{E}[L(Q(t+1)) - L(Q(t)) \mid Q(t)] $$
 
-By choosing the action that minimizes this drift, we are inherently prioritizing the users that will lead to the largest reduction in overall queue pressure. This naturally leads to a scheduling rule known as a **Max-Weight** algorithm.
+By choosing the action that minimizes this drift, we are inherently prioritizing the users that will lead to the largest reduction in overall queue pressure.
 
 ---
 
-## 📈 The Scheduling Metric: A Weighted Max-Weight Algorithm
+## 📈 The Scheduling Metric: A Tunable Weighted Max-Weight Algorithm
 
-The rule that minimizes the Lyapunov drift is one that maximizes the product of queue size and service rate. To incorporate different service priorities, we use a **Weighted Max-Weight** approach.
+The rule that minimizes the Lyapunov drift can be extended to a **Weighted Max-Weight** algorithm that incorporates QoS. This scheduler uses a tunable version of this metric to provide precise control over its behavior.
 
-The core metric used by this scheduler is:
-$$  Score = Queue\_Backlog \times Instantaneous\_Rate \times QoS\_Weight $$
-This combines the three factors essential for intelligent scheduling:
-* **Urgency (`Queue_Backlog`)**: How much data is waiting? This is the primary term derived from the Lyapunov drift.
-* **Opportunity (`Instantaneous_Rate`)**: How good is the user's channel right now?
-* **Importance (`QoS_Weight`)**: How critical is this specific data flow?
+The final score for each user is calculated as:
+$$ Score = Q(t)^\alpha \cdot R(t) \cdot W^\beta $$
 
-> #### An Important Refinement
-> In practice, a raw `Queue_Backlog` can grow so large that it overpowers the `QoS_Weight`. A more robust implementation (and the recommended version for research) uses the logarithm of the queue to dampen this effect, making the scheduler more responsive to the QoS priority: 
-$$ Score = \log(1 + Queue\_Backlog) \times Instantaneous\_Rate \times QoS\_Weight $$
+This combines three factors essential for intelligent scheduling:
+* **Urgency ($Q(t)^\alpha$)**: How much data is waiting in the queue, amplified by the `alpha` exponent. A higher `alpha` makes the scheduler more sensitive to growing queues, aggressively working to control latency.
+* **Opportunity ($R(t)$)**: How good is the user's channel quality right now? This is the instantaneous achievable data rate.
+* **Importance ($W^\beta$)**: How critical is this data flow? This is a static weight derived from 5G QoS parameters (QFI, priority level, etc.) and amplified by the `beta` exponent. A higher `beta` makes the scheduler more ruthless in enforcing the QoS hierarchy.
+
 ---
 
+## ✨ Features
 
+* **Unified Hybrid Logic:** Implements a single-pass scheduling logic that provides strict priority for mission-critical traffic (via score bonus) and utility-based scheduling for all other flows.
+* **Aggressive QoS Differentiation:** Employs an exponential weighting scheme to create massive mathematical separation between traffic classes.
+* **Tunable Performance:** Fully configurable via `.ini` file parameters (`alpha` and `beta`) to adjust the scheduler's sensitivity to queue growth and its QoS aggressiveness.
+* **Stable & Robust:** The final implementation is simplified to a single priority queue, making it efficient and free of the logical bugs present in multi-list approaches.
 
-## 💻 4. Code Implementation Explained
+---
 
-The implementation of this theory is primarily contained within the `prepareSchedule()` function of `LyapunovScheduler.cc`. The scheduler's lifecycle in each time slot follows a clear pattern.
+## 🔧 System Prerequisites
 
-### Part 1: Gathering Inputs for All Active Connections
+* **OMNeT++:** Version 6.0 or newer
+* **INET Framework:** Version 4.5 or newer
+* **Simu5G:** Version 1.3.0
 
-The scheduler's main `for` loop iterates through every active connection (`cid`) provided by the framework in the `carrierActiveConnectionSet_`. For each `cid`, it gathers the three key components of our metric.
+---
 
-**1. `Queue_Backlog` (The Urgency)**
-This code block retrieves the current data queue size for the user. A critical part of this implementation is the workaround for a bug in the Simu5G framework where the BSR buffer map is incorrectly keyed by `MacCid` instead of `MacNodeId`. Our code correctly searches this map using the `cid` to find the associated queue size.
+## 🛠️ Installation & Setup
+
+Follow these steps to integrate the custom Lyapunov scheduler into your Simu5G project.
+
+### 1. Add Scheduler Source Files
+
+Place the following two files into your Simu5G project directory at **`src/stack/mac/scheduling_modules/`**.
+
+* `LyapunovScheduler.h`
+* `LyapunovScheduler.cc`
+
+*(The full code for these files is provided below.)*
+
+### 2. Register the Scheduler in the Framework
+
+You must modify two Simu5G framework files to make the simulator aware of your new scheduler.
+
+#### a) Modify `LteMacEnb.ned`
+
+Open **`src/stack/mac/LteMacEnb.ned`**. You need to add `LYAPUNOV_SCHEDULER` to the `schedulerType` enum and declare the `alpha` and `beta` parameters.
+
+```ned
+// In src/stack/mac/LteMacEnb.ned
+simple LteMacEnb
+{
+    parameters:
+        // ... (other parameters)
+
+        // --> ADD "LYAPUNOV_SCHEDULER" to this list
+        string schedulingDisciplineDl @enum(DRR,PF,MAXCI,MAXCI_MB,MAXCI_OPT_MB,MAXCI_COMP,ALLOCATOR_BESTFIT,QOS_PF,LYAPUNOV_SCHEDULER) = default("MAXCI");
+        string schedulingDisciplineUl @enum(DRR,PF,MAXCI,MAXCI_MB,MAXCI_OPT_MB,MAXCI_COMP,ALLOCATOR_BESTFIT,QOS_PF,LYAPUNOV_SCHEDULER) = default("MAXCI");
+        
+
+        // --> ADD these two lines for your scheduler's parameters
+        double alpha = default(1.0);
+        double beta = default(1.0);
+
+    // ... (rest of the file)
+}
+```
+
+#### b) Modify `LteSchedulerEnb.cc`
+
+Open **`src/stack/mac/scheduler/LteSchedulerEnb.cc`**. Add a `case` to the `getScheduler` function so the framework knows how to create an instance of your scheduler.
 
 ```cpp
-// The BSR virtualBuffers map is incorrectly keyed by MacCid instead of MacNodeId.
-// This workaround uses the current 'cid' to look up the queue size from the broken map.
-double queueBacklog = 0;
-for (auto const& [key_cid, buffer_ptr] : *virtualBuffers) {
-    if (key_cid == cid) {
-        if (buffer_ptr != nullptr) {
-            queueBacklog = buffer_ptr->getQueueOccupancy();
+// In src/stack/mac/scheduler/LteSchedulerEnb.cc, inside the getScheduler() function
+
+// FIND THIS:
+// case QOS_PF:
+//     return new QoSAwareScheduler(binder_, mac_->par("pfAlpha").doubleValue());
+
+// --> ADD YOUR CASE AFTER IT:
+        case LYAPUNOV_SCHEDULER:
+            return new LyapunovScheduler(binder_, mac_->par("alpha").doubleValue(), mac_->par("beta").doubleValue());
+```
+
+### 3. Recompile Simu5G
+
+After saving all file changes, clean and rebuild your entire Simu5G project.
+
+```bash
+make clean
+make
+```
+
+---
+
+## ⚙️ Configuration
+
+To use the scheduler, configure your `.ini` and QoS mapping files.
+
+### `omnetpp.ini` Configuration
+
+```ini
+# 1. Select your custom scheduler
+**.gNBs.lteNic.mac.schedulerType = "LYAPUNOV_SCHEDULER"
+
+# 2. Provide the tuning parameters for your scheduler
+**.gNBs.lteNic.mac.scheduler.alpha = 1.5
+**.gNBs.lteNic.mac.scheduler.beta = 1.2
+
+# 3. Ensure queues are large enough to prevent artificial packet drops
+*.gnb.**.queueSize = 204800B
+*.ue[*].**.queueSize = 204800B
+
+---
+
+## 💻 Code Implementation
+
+These are the complete, final source files for the custom scheduler.
+
+### `LyapunovScheduler.h`
+
+```cpp
+/*
+ * LyapunovScheduler.h
+ *
+ * Author: kouros
+ */
+
+#ifndef __SIMU5G_LYAPUNOVSCHEDULER_H_
+#define __SIMU5G_LYAPUNOVSCHEDULER_H_
+
+#include <omnetpp.h>
+#include "stack/mac/scheduler/LteScheduler.h"
+#include "stack/sdap/common/QfiContextManager.h"
+
+namespace simu5g {
+
+class LteSchedulerEnb;
+
+class LyapunovScheduler : public LteScheduler
+{
+  protected:
+    // Manager for QoS Flow Identifier contexts
+    QfiContextManager* qfiContextMgr_ = nullptr;
+    bool contextLoaded_ = false;
+
+    double alpha_;
+    double beta_;
+
+    // Map to store granted bytes in the current TTI for each connection
+    std::map<MacCid, unsigned int> grantedBytes_;
+
+    // Temporary set of active connections for the current scheduling period
+    ActiveSet activeConnectionTempSet_;
+
+    // Small epsilon value for floating point comparisons and randomization
+    const double scoreEpsilon_ = 1e-6;
+
+    typedef std::pair<MacCid, double> ScoredCid;
+
+    // --- Methods ---
+
+    // Initializes the QFI context manager
+    void loadContextIfNeeded();
+
+    // Retrieves the QFI context for a given Connection ID (CID)
+    const QfiContext* getQfiContextForCid(MacCid cid);
+
+    // Calculates a weight based on the QoS parameters of a flow
+    double computeQosWeightFromContext(const QfiContext& ctx);
+
+
+  public:
+    // Constructor - Simplified to remove PF parameters
+    LyapunovScheduler(Binder* binder, double alpha, double beta);
+
+
+    // Main scheduling functions
+    void prepareSchedule() override;
+    void commitSchedule() override;
+};
+
+} // namespace simu5g
+
+#endif // __SIMU5G_LYAPUNOVSCHEDULER_H_
+
+```
+
+### `LyapunovScheduler.cc`
+
+```cpp
+
+/*
+ * LyapunovScheduler.cc
+ *
+ * Author: kouros
+ */
+
+#include "stack/mac/scheduling_modules/LyapunovScheduler.h"
+#include "stack/mac/scheduler/LteSchedulerEnb.h"
+#include "stack/mac/LteMacEnb.h"
+#include "stack/mac/buffer/LteMacBuffer.h"
+
+namespace simu5g {
+
+using namespace omnetpp;
+
+
+
+// Constructor saves alpha and beta using an initializer list
+LyapunovScheduler::LyapunovScheduler(Binder* binder, double alpha, double beta)
+    : LteScheduler(binder), alpha_(alpha), beta_(beta)
+{
+    loadContextIfNeeded();
+    EV << "LyapunovScheduler created with alpha: " << alpha_ << ", beta: " << beta_ << endl;
+}
+
+
+void LyapunovScheduler::loadContextIfNeeded()
+{
+    if (!contextLoaded_) {
+        qfiContextMgr_ = QfiContextManager::getInstance();  // singleton
+        ASSERT(qfiContextMgr_ != nullptr);
+        contextLoaded_ = true;
+    }
+}
+
+double LyapunovScheduler::computeQosWeightFromContext(const QfiContext& ctx)
+{
+    // Base weight for all flows
+    double weight = 1.0;
+
+    // --- Exponential Priority Scaling ---
+    // Use a base value greater than 1. A higher base creates more separation.
+    const double priorityBase = 2.0;
+    // Lower priorityLevel is better (e.g., 1 is higher priority than 9).
+    // This creates an exponential gap: level 1 gets 2^8, level 9 gets 2^0.
+    weight *= pow(priorityBase, 9 - ctx.priorityLevel);
+
+    // --- Delay Budget Scaling ---
+    // Extremely aggressive bonus for tight delay budgets (URLLC-like)
+    if (ctx.delayBudgetMs <= 10) {
+        weight *= 10.0;
+    } else if (ctx.delayBudgetMs <= 50) {
+        weight *= 3.0;
+    }
+
+    // --- GBR Bonus ---
+    // Provide a significant, constant multiplier for guaranteed bit rate flows.
+    if (ctx.isGbr) {
+        weight *= 2.0;
+    }
+
+    EV_INFO << NOW << " LyapunovScheduler [QFI=" << ctx.qfi << ", PrioLvl=" << ctx.priorityLevel << "]"
+            << " --> Computed Aggressive Weight: " << weight << endl;
+
+    return weight;
+}
+
+const QfiContext* LyapunovScheduler::getQfiContextForCid(MacCid cid)
+{
+    if (!qfiContextMgr_) return nullptr;
+    int qfi = qfiContextMgr_->getQfiForCid(cid);
+    if (qfi < 0) {
+        EV_WARN << "LyapunovScheduler: No QFI registered for CID " << cid << "\n";
+        return nullptr;
+    }
+    return qfiContextMgr_ -> getContextByQfi(qfi);
+}
+
+
+
+struct SchedulingInfo {
+    MacCid cid;
+    const QfiContext* qfiContext;
+    double queueBacklog;
+    double achievableRate; // in bytes per resource block
+};
+
+void LyapunovScheduler::prepareSchedule()
+{
+    EV << NOW << " HybridLyapunovScheduler::prepareSchedule (Final Fixed Version)" << endl;
+
+    const LteMacBufferMap* virtualBuffers = (direction_ == UL) ? eNbScheduler_->mac_->getBsrVirtualBuffers() : nullptr;
+    grantedBytes_.clear();
+    activeConnectionTempSet_ = *activeConnectionSet_;
+
+    // --- Unified priority queue for all traffic ---
+    auto compare = [](const ScoredCid& a, const ScoredCid& b) { return a.second < b.second; };
+    std::priority_queue<ScoredCid, std::vector<ScoredCid>, decltype(compare)> scoreQueue(compare);
+
+    // --- Single Pass Data Gathering and Scoring ---
+    for (const auto& cid : carrierActiveConnectionSet_)
+    {
+        MacNodeId nodeId = MacCidToNodeId(cid);
+        if (nodeId == NODEID_NONE || binder_->getOmnetId(nodeId) == 0) continue;
+
+        double backlog = 0;
+        Direction dir = (direction_ == UL) ? UL : DL;
+
+        if (dir == DL) {
+            backlog = eNbScheduler_->mac_->getDlQueueSize(cid);
+        } else { // Uplink
+            if (virtualBuffers && virtualBuffers->count(cid) > 0) {
+                backlog = virtualBuffers->at(cid)->getQueueOccupancy();
+            }
         }
-        break;
+        if (backlog == 0) continue;
+
+        const UserTxParams& info = eNbScheduler_->mac_->getAmc()->computeTxParams(nodeId, dir, carrierFrequency_);
+        if (info.readCqiVector().empty() || info.readBands().empty()) continue;
+
+        unsigned int availableBlocks = 0, availableBytes = 0;
+        for (auto antenna : info.readAntennaSet()) {
+            for (auto band : info.readBands()) {
+                unsigned int blocks = eNbScheduler_->readAvailableRbs(nodeId, antenna, band);
+                availableBlocks += blocks;
+                availableBytes += eNbScheduler_->mac_->getAmc()->computeBytesOnNRbs(nodeId, band, blocks, dir, carrierFrequency_);
+            }
+        }
+        double achievableRate = (availableBlocks > 0) ? static_cast<double>(availableBytes) / availableBlocks : 0.0;
+        if (achievableRate == 0) continue;
+
+        const QfiContext* ctx = getQfiContextForCid(cid);
+        double qosWeight = ctx ? computeQosWeightFromContext(*ctx) : 1.0;
+
+        // --- Score calculation with tuning exponents ---
+        double score = pow(backlog, alpha_) * achievableRate * pow(qosWeight, beta_);
+
+        // --- Correct Strict Priority logic using a massive score bonus ---
+        if (ctx && ctx->qfi == 4) { // QFI 4 for URLLC
+            score *= 1e12;
+        }
+
+        score += uniform(getEnvir()->getRNG(0), -scoreEpsilon_, scoreEpsilon_);
+
+        EV_INFO << NOW << " LyapunovScheduler [CID=" << cid << ", QFI=" << (ctx ? ctx->qfi : -1) << "]"
+                << " Backlog(Q^a)=" << pow(backlog, alpha_)
+                << " Rate(R)=" << achievableRate
+                << " Weight(W^b)=" << pow(qosWeight, beta_)
+                << " --> FINAL SCORE=" << score << endl;
+
+        scoreQueue.push({cid, score});
+    }
+
+    // --- Unified Granting Loop ---
+    while (!scoreQueue.empty())
+    {
+        ScoredCid current = scoreQueue.top();
+        scoreQueue.pop();
+
+        bool terminate = false, active = true, eligible = true;
+        unsigned int granted = requestGrant(current.first, UINT32_MAX, terminate, active, eligible);
+        grantedBytes_[current.first] += granted;
+
+        if (terminate) break;
+        if (!active) {
+            activeConnectionTempSet_.erase(current.first);
+            carrierActiveConnectionSet_.erase(current.first);
+        }
     }
 }
 
-```
 
-**2. `Instantaneous_Rate` (The Opportunity)** This block queries the AMC (Adaptive Modulation and Coding) module to determine the potential data rate based on the UE's reported channel quality. It calculates the total bytes that could be transmitted across all available resource blocks.
 
-```
-unsigned int availableBlocks = 0, availableBytes = 0;
-for (auto antenna : info.readAntennaSet()) {
-    for (auto band : info.readBands()) {
-        unsigned int blocks = eNbScheduler_->readAvailableRbs(nodeId, antenna, band);
-        availableBlocks += blocks;
-        availableBytes += eNbScheduler_->mac_->getAmc()->computeBytesOnNRbs(nodeId, band, blocks, dir, carrierFrequency_);
-    }
+
+
+
+void LyapunovScheduler::commitSchedule()
+{
+    *activeConnectionSet_ = activeConnectionTempSet_;
 }
-// The Instantaneous Rate is effectively (availableBytes / availableBlocks)
 
+} // namespace simu5g
 ```
 
-**3. `QoS_Weight` (The Importance)** This block queries the `QfiContextManager` singleton to get the 5G QoS parameters associated with the current `cid` and computes a static priority weight based on a predefined formula.
+---
 
-```
-const QfiContext* ctx = getQfiContextForCid(cid);
-double qosWeight = ctx ? computeQosWeightFromContext(*ctx) : 1.0;
+## 📊 Expected Outcome
 
-```
+When running a simulation with heavy congestion, the `LyapunovScheduler` should demonstrate significantly better QoS protection for high-priority flows compared to a baseline `QOS_PF` scheduler. This will be visible in the final statistics as:
+* **Higher Throughput & Lower Latency** for high-priority flows (e.g., QFI 4, 5).
+* **Significantly Lower Throughput** for the best-effort flow (e.g., QFI 7), which is intentionally starved to protect the critical traffic.
 
-### Part 2: Calculating the Metric and Making the Decision
+This behavior proves the effectiveness of the stability-oriented approach in maintaining strict QoS guarantees.
 
-These three components are then combined in a direct implementation of our Weighted Max-Weight formula. The result (`s`) is logged for analysis and then pushed to a `std::priority_queue`. The priority queue is a highly efficient data structure that automatically sorts all the connections, ensuring that when we start granting resources, we begin with the connection that has the highest score.
+---
 
-```
-// The direct implementation of the Lyapunov-based scheduling metric
-double s = (availableBlocks > 0 && queueBacklog > 0)
-               ? queueBacklog * (static_cast<double>(availableBytes) / availableBlocks) * qosWeight
-               : 0.0;
+## 📜 License
 
-// The priority queue makes the final scheduling decision
-score.push({cid, s});
-
-```
-
-Finally, the `while (!score.empty())` loop iterates through the sorted connections and calls `requestGrant()` to allocate resources until all connections have been served or all radio resources for the time slot have been exhausted.
-
-## 📊 5. Behavior Under Different Network Conditions
-
-The true value of this scheduler is revealed when the network is under load.
-
--   **In an Uncongested Network:** When the total offered load is less than the channel capacity, any well-behaved scheduler will perform similarly. Since there are enough resources for all applications, both the Lyapunov scheduler and a PF scheduler will grant nearly 100% of the requested traffic. The results will appear almost identical.
-    
--   **In a Congested Network:** This is where the Lyapunov scheduler excels. When the demand for resources exceeds the supply, it becomes ruthless and efficient.
-    
-    -   It will heavily prioritize the flows with the highest `QoS_Weight` to keep their queues small, ensuring their low-latency and high-reliability requirements are met.
-        
-    -   It will sacrifice the performance of low-priority, best-effort traffic, allowing its queues to grow and packets to be dropped if necessary to protect the critical flows.
-        
-    -   This behavior is in stark contrast to a PF scheduler, which would attempt to maintain fairness by "stealing" resources from high-priority flows to serve the low-priority ones, thereby violating the strict QoS hierarchy.
-        
-
-## 🚀 6. Conclusion and Future Work
-
-This project successfully implements a QoS-aware scheduler based on the principles of Lyapunov optimization. Through simulation in a congested industrial 5G scenario, it has been shown to effectively protect high-priority, delay-sensitive traffic by prioritizing system stability over traditional fairness metrics.
+This project is licensed under the MIT License.
