@@ -954,7 +954,7 @@ LteScheduler *LteSchedulerEnb::getScheduler(SchedDiscipline discipline)
             return new QoSAwareScheduler(binder_, mac_->par("pfAlpha").doubleValue());
 
         case LYAPUNOV_SCHEDULER:
-            return new LyapunovScheduler(binder_, mac_->par("alpha").doubleValue(), mac_->par("beta").doubleValue());
+            return new LyapunovScheduler(binder_, mac_->par("lyAlpha").doubleValue(), mac_->par("lyBeta").doubleValue());
 
 
         default:

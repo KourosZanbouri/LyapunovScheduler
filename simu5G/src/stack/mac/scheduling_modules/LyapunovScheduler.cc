@@ -17,11 +17,11 @@ using namespace omnetpp;
 
 
 // Constructor saves alpha and beta using an initializer list
-LyapunovScheduler::LyapunovScheduler(Binder* binder, double alpha, double beta)
-    : LteScheduler(binder), alpha_(alpha), beta_(beta)
+LyapunovScheduler::LyapunovScheduler(Binder* binder, double lyAlpha, double lyBeta)
+    : LteScheduler(binder), lyAlpha_(lyAlpha), lyBeta_(lyBeta)
 {
     loadContextIfNeeded();
-    EV << "LyapunovScheduler created with alpha: " << alpha_ << ", beta: " << beta_ << endl;
+    EV << "LyapunovScheduler created with lyAlpha: " << lyAlpha_ << ", lyBeta: " << lyBeta_ << endl;
 }
 
 
@@ -88,7 +88,7 @@ struct SchedulingInfo {
 
 void LyapunovScheduler::prepareSchedule()
 {
-    EV << NOW << " HybridLyapunovScheduler::prepareSchedule (Final Fixed Version)" << endl;
+    EV << NOW << " HybridLyapunovScheduler::prepareSchedule" << endl;
 
     const LteMacBufferMap* virtualBuffers = (direction_ == UL) ? eNbScheduler_->mac_->getBsrVirtualBuffers() : nullptr;
     grantedBytes_.clear();
@@ -134,7 +134,7 @@ void LyapunovScheduler::prepareSchedule()
         double qosWeight = ctx ? computeQosWeightFromContext(*ctx) : 1.0;
 
         // --- Score calculation with tuning exponents ---
-        double score = pow(backlog, alpha_) * achievableRate * pow(qosWeight, beta_);
+        double score = pow(backlog, lyAlpha_) * achievableRate * pow(qosWeight, lyBeta_);
 
         // --- Correct Strict Priority logic using a massive score bonus ---
         if (ctx && ctx->qfi == 4) { // QFI 4 for URLLC
@@ -144,9 +144,9 @@ void LyapunovScheduler::prepareSchedule()
         score += uniform(getEnvir()->getRNG(0), -scoreEpsilon_, scoreEpsilon_);
 
         EV_INFO << NOW << " LyapunovScheduler [CID=" << cid << ", QFI=" << (ctx ? ctx->qfi : -1) << "]"
-                << " Backlog(Q^a)=" << pow(backlog, alpha_)
+                << " Backlog(Q^a)=" << pow(backlog, lyAlpha_)
                 << " Rate(R)=" << achievableRate
-                << " Weight(W^b)=" << pow(qosWeight, beta_)
+                << " Weight(W^b)=" << pow(qosWeight, lyBeta_)
                 << " --> FINAL SCORE=" << score << endl;
 
         scoreQueue.push({cid, score});
@@ -169,10 +169,6 @@ void LyapunovScheduler::prepareSchedule()
         }
     }
 }
-
-
-
-
 
 
 void LyapunovScheduler::commitSchedule()

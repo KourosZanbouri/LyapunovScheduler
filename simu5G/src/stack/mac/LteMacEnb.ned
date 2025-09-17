@@ -78,8 +78,9 @@ simple LteMacEnb extends LteMacBase
         // Proportional Fair parameters
         double pfAlpha = default(0.95);
 
-        double alpha = default(1.0);
-        double beta = default(1.0);
+		//Lyapunov Parameters
+		double lyAlpha = default(1.0);
+		double lyBeta  = default(1.0);
 
         string pilotMode @enum(IN_CQI,MAX_CQI,AVG_CQI,MEDIAN_CQI,ROBUST_CQI) = default("ROBUST_CQI");
 

@@ -22,8 +22,8 @@ class LyapunovScheduler : public LteScheduler
     QfiContextManager* qfiContextMgr_ = nullptr;
     bool contextLoaded_ = false;
 
-    double alpha_;
-    double beta_;
+    double lyAlpha_;
+    double lyBeta_;
 
     // Map to store granted bytes in the current TTI for each connection
     std::map<MacCid, unsigned int> grantedBytes_;
@@ -50,7 +50,7 @@ class LyapunovScheduler : public LteScheduler
 
   public:
     // Constructor - Simplified to remove PF parameters
-    LyapunovScheduler(Binder* binder, double alpha, double beta);
+    LyapunovScheduler(Binder* binder, double lyAlpha, double lyBeta);
 
 
     // Main scheduling functions
